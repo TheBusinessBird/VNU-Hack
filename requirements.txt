@@ -1,0 +1,4 @@
+# Proiectul foloseste doar biblioteca standard Python (3.9+): nu e nevoie de nicio instalare pip.
+# run.ps1 instaleaza automat orice pachet adaugat aici (o linie pe pachet).
+# Optional, doar pentru rezumate cu Claude in loc de Groq (SUMMARY_PROVIDER=claude):
+# anthropic

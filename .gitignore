@@ -1,0 +1,5 @@
+api/anthropic_key.txt
+api/groq_key.txt
+logs/
+api/cache/*.tmp
+__pycache__/

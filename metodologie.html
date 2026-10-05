@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metodologie — PoliticieniRO</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="methodology">
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Politicieni<span>RO</span></a>
+    <nav class="nav">
+      <a href="index.html">Politicieni</a>
+      <a href="index.html#partide">Partide</a>
+      <a href="quiz.html">Quiz</a>
+      <a href="metodologie.html" aria-current="page">Metodologie</a>
+    </nav>
+    <a class="pill" href="quiz.html">Află-ți orientarea</a>
+  </div>
+</header>
+<main class="meth">
+  <h1>Metodologie</h1>
+  <p class="lead">Cum sunt obținute datele și cum sunt calculate scorurile, pas cu pas. Tot ce e marcat <span class="live-tag">din cod</span> este citit direct din API-ul care rulează, nu scris de mână, deci nu poate diferi de ce se întâmplă de fapt.</p>
+
+  <div class="callout">
+    <b>Pe scurt.</b> Pentru fiecare politician, un program caută pe web declarațiile lui, le extrage din articole și stenograme, un model AI le semnalează când par false, contradictorii sau manipulatoare, iar din aceste semnalări se calculează un scor de credibilitate între 1 și 10. <b>Scorurile sunt estimări automate, nu verdicte</b>: modelul nu are acces la internet și nu verifică faptele. Fiecare scor poate fi urmărit până la citatul din sursă.
+    <p class="small muted" id="meth-status">Se încarcă datele din API…</p>
+  </div>
+
+  <nav class="toc" aria-label="Cuprins">
+    <a href="#flux">1. Fluxul</a><a href="#surse">2. De unde vin datele</a><a href="#extragere">3. Ce extragem</a><a href="#erori">4. Erorile logice</a>
+    <a href="#scor-articol">5. Scorul unui articol</a><a href="#scor-politician">6. Scorul politicianului</a><a href="#axe">7. Orientarea pe axe</a>
+    <a href="#quiz">8. Quiz și asemănare</a><a href="#rezumate">9. Rezumatele</a><a href="#modele">10. Modele și parametri</a>
+    <a href="#manual">11. Date introduse manual</a><a href="#cache">12. Salvare și reproductibilitate</a><a href="#limite">13. Limite</a><a href="#cod">14. Cod și verificare</a>
+  </nav>
+
+  <section id="flux" class="meth-sec">
+    <h2>1. Fluxul, pe scurt</h2>
+    <ol class="steps">
+      <li><b>Căutare.</b> Interogări către Bing (web și știri) pentru numele politicianului, plus căutări dedicate pe site-urile instituțiilor oficiale.</li>
+      <li><b>Descărcare.</b> Se descarcă paginile găsite și, de pe aceleași domenii, linkurile relevante din ele.</li>
+      <li><b>Filtrare.</b> Rămân doar paginile cu text suficient în care numele apare ca atare.</li>
+      <li><b>Extragere.</b> Din text se scot discursurile, citatele directe, promisiunile, autorul, data, precum și fragmentele despre studii și finanțare.</li>
+      <li><b>Erori logice.</b> Un model AI citește ultimele declarații și semnalează ce pare fals, contradictoriu, conspiraționist, neverificabil, improbabil, o eroare de raționament sau înșelător.</li>
+      <li><b>Scor.</b> Pe baza declarațiilor și a semnalărilor, un model notează fezabilitatea, precizia, istoricul și manipularea, iar notele se combină cu o formulă fixă.</li>
+      <li><b>Salvare.</b> Fiecare rezultat se salvează pe server și nu se mai regenerează.</li>
+    </ol>
+  </section>
+
+  <section id="surse" class="meth-sec">
+    <h2>2. De unde vin datele</h2>
+    <h3>2.1 Nu există o listă fixă de site-uri de știri</h3>
+    <p>Programul <b>nu are o listă aleasă de ziare</b>. Folosește motorul de căutare <b>Bing</b>, prin fluxurile lui RSS publice: căutarea web (<code>bing.com/search?format=rss</code>) și căutarea de știri (<code>bing.com/news/search?format=rss</code>), cu limba și regiunea setate pe România. Sursele sunt, deci, paginile pe care Bing le returnează pentru interogările de mai jos. Un site apare în listă doar dacă Bing l-a indexat și l-a clasat pentru numele respectiv.</p>
+    <p>Cu cât un site publică mai mult despre un politician, cu atât are mai multe articole în analiză. Asta poate favoriza sau dezavantaja anumite publicații și este o limită cunoscută (vezi secțiunea 13).</p>
+
+    <h3>2.2 Interogările</h3>
+    <p>Pentru fiecare politician se generează până la <b class="live" data-k="max_queries">90</b> de interogări, intercalate pe categorii (general, oficial, studii, finanțare, ani), câte <b class="live" data-k="pages_per_query">2</b> pagini de câte <b class="live" data-k="results_per_page">50</b> de rezultate. Șabloanele (<code>{n}</code> = numele):</p>
+    <details><summary>Șabloane de căutare generale <span class="live-tag">din cod</span></summary><ul class="chips" id="list-templates"></ul></details>
+    <details><summary>Cuvinte pentru căutările despre studii <span class="live-tag">din cod</span></summary><ul class="chips" id="list-edu-words"></ul></details>
+    <details><summary>Cuvinte pentru căutările despre finanțare și venituri <span class="live-tag">din cod</span></summary><ul class="chips" id="list-fund-words"></ul></details>
+
+    <h3>2.3 Domeniile oficiale (prioritare)</h3>
+    <p>Pentru instituțiile de mai jos se fac căutări dedicate (<code>"Nume" site:domeniu</code>, cu „stenogramă” și „declarații”), iar sursele de pe ele primesc un scor de utilitate mai mare. Acolo se găsesc stenogramele ședințelor, comunicatele și biografiile oficiale.</p>
+    <ul class="chips" id="list-official"></ul>
+
+    <h3>2.4 Descărcarea și ce se acceptă</h3>
+    <ul class="plain">
+      <li>Se descarcă cel mult <b class="live" data-k="max_sources">125</b> de pagini din rezultatele căutării, apoi, de pe aceleași domenii, până la <b class="live" data-k="crawl_cap">60</b> de linkuri pe rundă, în <b class="live" data-k="crawl_depth">2</b> runde. Linkul trebuie să conțină numele sau un cuvânt-cheie (discurs, declarație, stenogramă, buget, studii…). Timpul maxim e de <b class="live" data-k="time_budget_s">360</b> de secunde.</li>
+      <li>O pagină e păstrată doar dacă are cel puțin <b class="live" data-k="min_chars">300</b> de caractere de text și dacă numele (sau o variantă a lui) apare ca <b>cuvânt întreg</b>: „Dan” nu se potrivește în „Bogdan”.</li>
+      <li>Se ignoră fișierele (imagini, PDF, audio/video, arhive, foi de calcul etc.).</li>
+      <li>Paginile care nu răspund sau interzic accesul (timeout, 403) sunt sărite; nu sunt înlocuite și nu apar nicăieri ca eroare.</li>
+      <li>Programul se prezintă ca <code id="ua">promise-tracker</code> și citește doar pagini publice. Adresele către rețele private sunt blocate.</li>
+      <li>Documentele mai vechi de <b class="live" data-k="years_back">8</b> ani se folosesc doar pentru studii (o biografie rămâne valabilă). Pe site se afișează știrile din ultimele 12 luni.</li>
+    </ul>
+
+    <h3>2.5 Site-urile din care s-au extras surse efectiv</h3>
+    <p>Lista de mai jos este calculată din analizele salvate pe server și se actualizează pe măsură ce sunt analizați mai mulți politicieni. <span class="live-tag">din date</span></p>
+    <div id="by-politician" class="small muted"></div>
+    <div class="table-tools"><input type="search" id="domain-filter" placeholder="Filtrează site-urile…" aria-label="Filtrează site-urile"><span class="small muted" id="domain-count"></span></div>
+    <div class="table-wrap"><table class="meth-table" id="domain-table">
+      <thead><tr><th>Site</th><th class="num">Surse</th><th class="num">Cu declarații</th><th>Politicieni</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="small muted">„Surse” = pagini analizate de pe site; „Cu declarații” = din ele, câte conțin discursuri sau citate ale politicianului. <b>Oficial</b> = domeniu din lista de la 2.3.</p>
+
+    <h3>2.6 Alte surse externe</h3>
+    <ul class="plain">
+      <li><b>Fotografii și logo-uri:</b> Wikimedia Commons, doar fișiere cu licență liberă. Pe pagina fiecărui partid este menționată licența și linkul către fișier (la PSD, CC BY 2.0).</li>
+      <li><b>Modele AI:</b> Groq (vezi secțiunea 10). Textele articolelor sunt trimise către acest serviciu extern pentru analiză.</li>
+      <li><b>Educație și venit declarat:</b> tabelul introdus manual descris în secțiunea 11.</li>
+    </ul>
+  </section>
+
+  <section id="extragere" class="meth-sec">
+    <h2>3. Ce extragem din pagini</h2>
+    <ul class="plain">
+      <li><b>Data și autorul.</b> Din metadatele paginii (etichete meta, JSON-LD sau elemente marcate ca autor); data vine și din fluxul RSS al căutării. Dacă lipsesc, autorul apare ca „necunoscut”. Articolele fără dată nu sunt afișate în intervalul de 12 luni.</li>
+      <li><b>Discursuri.</b> În stenograme, replicile de forma „Nume Prenume: text” ale politicianului, până la următorul vorbitor, de cel puțin 150 de caractere.</li>
+      <li><b>Citate directe.</b> Text între ghilimele, de cel puțin 40 de caractere, aflat în același paragraf cu numele de familie al politicianului sau în paragrafele vecine. <b>Atribuirea nu e verificată semantic</b>: un citat din apropierea numelui poate aparține altcuiva.</li>
+      <li><b>Promisiuni.</b> Un citat e marcat promisiune dacă ține de angajamente, după cuvinte-cheie. Site-ul le arată ca „neevaluate”: nu verifică dacă au fost respectate.
+        <details><summary>Cuvinte-cheie pentru promisiuni <span class="live-tag">din cod</span></summary><ul class="chips" id="list-promise"></ul></details></li>
+      <li><b>Despre candidat.</b> Surse neoficiale care îl menționează, cu fragmentele în care apare numele.</li>
+      <li><b>Studii și finanțare.</b> Fragmente care conțin cuvinte-cheie despre educație sau finanțare (PNRR, buget local, fonduri europene, granturi…) <i>și</i> numele politicianului.
+        <details><summary>Cuvinte-cheie pentru studii <span class="live-tag">din cod</span></summary><ul class="chips" id="list-edu-kw"></ul></details>
+        <details><summary>Cuvinte-cheie pentru finanțare <span class="live-tag">din cod</span></summary><ul class="chips" id="list-fund-kw"></ul></details>
+      </li>
+      <li><b>Scor intern al sursei (0–100).</b> Folosit doar la ordonarea sursei, nu apare pe site: pornește de la 20, plus 45 dacă domeniul e oficial, 15 dacă titlul sau adresa conțin stenogramă/discurs/declarație/interviu, 8 pentru studii sau finanțare, până la 10 pentru texte lungi. Măsoară cât de utilă e sursa, <b>nu cât de adevărată</b>.</li>
+    </ul>
+  </section>
+
+  <section id="erori" class="meth-sec">
+    <h2>4. Erorile logice</h2>
+    <p>La cererea utilizatorului (butonul „Generează erori logice”), un model AI citește declarațiile și semnalează ce ar merita verificat. Se analizează <b>cele mai recente <span class="live" data-k="fc_max_news">20</span> de articole</b> din „Discursuri și promisiuni” (ultimele 12 luni), cu cel mult <b><span class="live" data-k="fc_per_news">3</span> declarații pe articol</b>. Sunt folosite pe rând modelele din secțiunea 10, pentru a respecta limitele de utilizare.</p>
+    <p>Fiecare semnalare are o categorie, o gravitate și o încredere (scăzută, medie, ridicată), un motiv și o indicație despre cum s-ar putea verifica. Categoriile:</p>
+    <table class="meth-table"><thead><tr><th>Categorie</th><th>Ce înseamnă</th></tr></thead><tbody>
+      <tr><td>Probabil fals</td><td>Afirmație verificabilă care contrazice fapte bine stabilite. Se folosește doar când modelul e destul de sigur.</td></tr>
+      <tr><td>Contradicție</td><td>Declarația se contrazice singură sau conține calcule care nu pot fi corecte.</td></tr>
+      <tr><td>Conspiraționist</td><td>Susține un complot ascuns sau o mușamalizare, fără dovezi.</td></tr>
+      <tr><td>Neverificabil</td><td>Sună factual, dar nu poate fi dovedită sau infirmată așa cum e formulată (surse nenumite, „toată lumea știe”).</td></tr>
+      <tr><td>Improbabil</td><td>Exagerări, termene sau bugete imposibile, rezultate absolute (0%, 100%).</td></tr>
+      <tr><td>Eroare logică</td><td>Raționament greșit: atac la persoană, om de paie, dilemă falsă, pantă alunecoasă, post hoc, apel la frică sau la autoritate, generalizare pripită, motiv luat drept dovadă.</td></tr>
+      <tr><td>Înșelător</td><td>Tehnic adevărat, dar înșelător: fără reper de comparație, perioadă aleasă convenabil, merit sau vină pentru lucruri din afara controlului.</td></tr>
+      <tr><td>Altfel suspect</td><td>Un semnal real care nu se încadrează în celelalte.</td></tr>
+    </tbody></table>
+    <h3>Garanții împotriva invențiilor</h3>
+    <ul class="plain">
+      <li><b>Fiecare citat semnalat e căutat în textul sursei</b> și, dacă nu se găsește, semnalarea e aruncată automat.</li>
+      <li>Se semnalează doar cuvintele politicianului, nu ale jurnaliștilor, adversarilor sau experților.</li>
+      <li>Opiniile, sloganurile și promisiunile obișnuite nu se semnalează.</li>
+      <li>Modelul are instrucțiunea să nu pretindă că a verificat ceva și să folosească „neverificabil” sau o încredere mică când nu e sigur.</li>
+    </ul>
+  </section>
+
+  <section id="scor-articol" class="meth-sec">
+    <h2>5. Scorul unui articol (insigna „/10”)</h2>
+    <p>Fiecare articol din cele analizate primește patru note de la 1 la 10, puse de modelul AI exclusiv pe baza declarațiilor din articol și a semnalărilor de pe ele:</p>
+    <table class="meth-table"><thead><tr><th>Notă</th><th>Ce măsoară</th><th class="num">Pondere</th></tr></thead><tbody>
+      <tr><td><b>x</b> · Fezabilitate</td><td>Cât de realiste sunt declarațiile în circumstanțele actuale (bugete, termene, limite legale și practice). Dacă articolul nu conține niciun plan sau nicio afirmație verificabilă, nota e 5.</td><td class="num live-w" data-w="feasibility">0,2</td></tr>
+      <tr><td><b>y</b> · Precizie</td><td>Cât de explicite, precise și detaliate sunt: cifre, termene, instituții numite, măsuri concrete. Sloganurile și generalitățile primesc note mici.</td><td class="num live-w" data-w="precision">0,2</td></tr>
+      <tr><td><b>z</b> · Istoric</td><td>Trecut curat = notă mare; minciuni sau conspirații repetate = notă mică. Se calculează <b>o singură dată pe politician</b>, din frecvența și gravitatea erorilor semnalate (cel mult <span class="live" data-k="cr_max_findings">50</span>, cele mai grave primele), și e aceeași la toate articolele lui.</td><td class="num live-w" data-w="history">0,4</td></tr>
+      <tr><td><b>w</b> · Manipulare</td><td>10 = discurs la obiect, care își recunoaște și defectele; 1 = înșelător sau manipulator (erori logice, conspirații, date alese convenabil, acuzații luate drept dovadă). Declarațiile semnalate ca eroare logică, conspirație sau înșelăciune trebuie să scadă nota.</td><td class="num live-w" data-w="manipulation">0,2</td></tr>
+    </tbody></table>
+    <p class="formula">Scor articol = 0,2·x + 0,2·y + 0,4·z + 0,2·w <span class="small muted">(rotunjit la o zecimală)</span></p>
+    <p><b>Exemplu.</b> x = 8, y = 6, z = 7, w = 5 → 0,2·8 + 0,2·6 + 0,4·7 + 0,2·5 = 1,6 + 1,2 + 2,8 + 1,0 = <b>6,6</b>.</p>
+    <ul class="plain">
+      <li><b>Culori:</b> verde de la 7, portocaliu de la 4,5 la 7, roșu sub 4,5. La hover pe insignă se văd cele patru note.</li>
+      <li><b>„–/10”</b> înseamnă că articolul nu a fost analizat (în afara celor 20 cele mai recente sau fără declarații atribuibile).</li>
+      <li>Pentru fiecare articol, modelul vede cel mult 3 declarații (primele 200 de caractere din fiecare) și cel mult 3 semnalări. Articolele se notează în loturi de cel mult <span class="live" data-k="cr_batch">8</span>.</li>
+      <li>Notele sunt numere întregi; valorile peste 10 sau sub 1 sunt aduse la limită, iar răspunsurile incomplete sunt ignorate.</li>
+    </ul>
+  </section>
+
+  <section id="scor-politician" class="meth-sec">
+    <h2>6. Scorul politicianului (indicatorul semicircular)</h2>
+    <p>Se aplică aceeași formulă, cu <b>x, y și w calculate ca medie pe articolele notate</b> și cu z (istoricul) calculat pe tot politicianul. La hover pe indicator apar notele, ponderile, câte declarații și câte erori au intrat în analiză și motivul notei de istoric. Aceleași numere apar pe cardul politicianului din pagina principală.</p>
+  </section>
+
+  <section id="axe" class="meth-sec">
+    <h2>7. Orientarea pe axe (radarul)</h2>
+    <p>Orientarea politică are <b>10 axe</b>, de la geopolitică (pro-occidental ↔ suveranist) la piața muncii (liberalizare ↔ protecționism). Pentru fiecare axă:</p>
+    <ol class="steps">
+      <li>Din textele politicianului se aleg, cu cuvinte-cheie, fragmentele relevante pentru acea axă (cel mult ~5000 de caractere), iar paragrafele trebuie să îl menționeze sau să fie citate directe.</li>
+      <li>Modelul stabilește polul (stâng, echilibrat, drept sau „niciun semnal”) și intensitatea (clară sau ușoară), cu citate din fragmente.</li>
+      <li>Scorul 1–5 rezultă determinist: <b>1</b> = pol stâng clar, <b>2</b> = ușor spre stâng, <b>3</b> = echilibrat, <b>4</b> = ușor spre drept, <b>5</b> = pol drept clar.</li>
+      <li>Citatele care nu apar în fragmentele trimise sunt șterse. Un verdict fără niciun citat verificat devine „dovezi insuficiente”, marcat cu cerc gol pe radar.</li>
+    </ol>
+    <p>Pentru o axă fără fragmente relevante, modelul nu este apelat deloc. Indicele general Dreapta–Stânga folosește doar axele „Identitate” și „Economie”. Aceste scoruri descriu cum <i>apar</i> pozițiile în textele găsite, nu convingerile reale ale persoanei.</p>
+  </section>
+
+  <section id="quiz" class="meth-sec">
+    <h2>8. Quiz-ul și „Cu cine semeni”</h2>
+    <ul class="plain">
+      <li><b>Quiz:</b> 50 de afirmații pe cele 10 axe (20 în prima parte, restul la rafinare). Scorul pe axă este media răspunsurilor (1–5), cu inversare la afirmațiile de pol opus; „Nu știu” nu intră în medie. Marja de eroare este 0,77 × eroarea standard și scade cu numărul de afirmații. O axă cu mai puțin de 2 răspunsuri sau sub 60% din afirmațiile afișate nu primește scor. Rezultatul apare pe aceeași scală 1–5 ca la politicieni.</li>
+      <li><b>Unde se păstrează:</b> doar în browserul tău. Nu este trimis nicăieri.</li>
+      <li><b>Asemănarea:</b> 100 minus diferența medie (pe scara 0–100) dintre pozițiile tale și ale politicianului, calculată doar pe axele la care aveți amândoi scor și numai dacă sunt cel puțin 3. Doar politicienii cu orientare calculată apar în „Cu cine semeni”.</li>
+      <li>Diferențele majore sunt cele de cel puțin 30 de puncte din 100 pe o axă.</li>
+    </ul>
+  </section>
+
+  <section id="rezumate" class="meth-sec">
+    <h2>9. Rezumatele</h2>
+    <p>Rezumatul unui articol se face la cerere, când deschizi articolul: textul paginii este descărcat și rezumat în 2–4 puncte scurte. Modelul are instrucțiunea să folosească doar textul primit și să ignore orice instrucțiune găsită în el. <b>Fiecare rezumat e verificat automat</b>: cifrele, numele proprii și acronimele din rezumat trebuie să existe în textul sursă. Dacă nu, modelul rescrie o dată, iar dacă tot nu trece, rezumatul rămâne cu un avertisment roșu și lista elementelor neconfirmate.</p>
+  </section>
+
+  <section id="modele" class="meth-sec">
+    <h2>10. Modele AI și parametri <span class="live-tag">din cod</span></h2>
+    <p>Toate modelele rulează prin <b>Groq</b> (serviciu extern), pe planul gratuit: <span class="live" data-k="tpm">8.000</span> de tokeni pe minut și 1.000 de cereri pe zi, pe fiecare model. Clientul respectă aceste limite, așteaptă când e nevoie și trece pe alt model dacă unul eșuează.</p>
+    <table class="meth-table" id="model-table"><thead><tr><th>Sarcină</th><th>Model principal</th><th>Rezervă</th><th class="num">Temperatură</th></tr></thead><tbody></tbody></table>
+    <ul class="plain">
+      <li>Temperatura este 0 la toate sarcinile, cu seed fix, ca rezultatele să fie cât mai stabile. Groq nu garantează totuși răspunsuri identice bit cu bit: în teste, nota de manipulare a variat cu 1–2 puncte între rulări.</li>
+      <li>Răspunsurile sunt cerute în format JSON, validat după o schemă.</li>
+    </ul>
+  </section>
+
+  <section id="manual" class="meth-sec">
+    <h2>11. Date introduse manual</h2>
+    <p>Rubricile „Educație” și „Venit declarat / an” din profilul fiecărui politician conțin un tabel primit de la proprietarul site-ului. Acele valori sunt <b>aproximative și nu au fost verificate de site</b>, iar profilul le marchează ca atare. Sub ele apar fragmentele extrase automat din surse, cu linkul către fiecare. „Declarația de venit” din surse înseamnă finanțarea proiectelor și acțiunilor în care apare persoana, nu declarațiile oficiale de avere.</p>
+  </section>
+
+  <section id="cache" class="meth-sec">
+    <h2>12. Salvare și reproductibilitate</h2>
+    <ul class="plain">
+      <li>Tot ce se generează se salvează pe server, în folderul <code>api/cache</code>: analiza surselor, orientarea, erorile logice, scorul de credibilitate și rezumatele. <b>Ce s-a generat o dată nu se mai generează</b>; o regenerare se face doar explicit. Pentru politicienii deja analizați, profilul apare imediat.</li>
+      <li>Fișierele salvate conțin sursele cu textul lor, deci oricine poate reconstitui de unde vine un scor.</li>
+      <li><b>Date curente în cache:</b> <span id="cache-inventory" class="small"></span></li>
+    </ul>
+  </section>
+
+  <section id="limite" class="meth-sec">
+    <h2>13. Limite și avertismente</h2>
+    <ul class="plain">
+      <li><b>Nu verifică faptele.</b> Modelele nu au acces la internet și nu consultă baze de date. Semnalările sunt piste pentru un verificator uman.</li>
+      <li><b>Selecția surselor depinde de Bing.</b> Nu e un eșantion reprezentativ al presei: site-urile care publică mult și sunt bine indexate apar mai des.</li>
+      <li><b>Acoperire parțială:</b> scorul se bazează pe cel mult 20 de articole și 3 declarații pe articol. Un politician cu puține declarații găsite are un scor mai nesigur.</li>
+      <li><b>Atribuirea citatelor</b> se face după apropierea de nume și poate greși.</li>
+      <li><b>Nota „Istoric” cântărește 40%</b>, dar se bazează doar pe erorile semnalate în declarațiile analizate, nu pe istoricul real al persoanei.</li>
+      <li><b>Ponderile</b> (0,2 / 0,2 / 0,4 / 0,2) sunt o alegere de proiectare, nu sunt validate empiric.</li>
+      <li><b>Modele mici și variabile:</b> pot greși sau fi inconsecvente; scorurile pot varia ușor de la o rulare la alta.</li>
+      <li><b>Limba:</b> textele sunt în română, iar modelele sunt antrenate predominant pe alte limbi.</li>
+      <li><b>Confidențialitate:</b> textele articolelor sunt trimise către Groq pentru analiză. Răspunsurile din quiz rămân în browser.</li>
+      <li>Scorurile nu sunt o recomandare de vot și nu trebuie citate ca fapte despre o persoană fără verificare la sursă.</li>
+    </ul>
+  </section>
+
+  <section id="cod" class="meth-sec">
+    <h2>14. Cod și verificare</h2>
+    <ul class="plain">
+      <li>Codul este în folderul proiectului: <code>api/promise_tracker_no_ai_v2.py</code> (căutare și extragere), <code>api/fact_checker_api.py</code> (erori logice), <code>api/credibility_llm.py</code> (scorul), <code>api/orientation_llm.py</code> (axe), <code>api/summarize_llm.py</code> (rezumate), <code>api/llm.py</code> (client Groq), <code>js/quiz.js</code> (quiz).</li>
+      <li>Testele automate se rulează cu <code>.\run.ps1 -Test</code> și acoperă formula scorului, limita de 50 de erori, verificarea citatelor, respectarea limitelor Groq și salvarea pe disc.</li>
+      <li>Fiecare scor poate fi urmărit: insigna articolului arată cele patru note, indicatorul politicianului arată cum s-a calculat, iar fiecare eroare semnalată are citatul și linkul sursei.</li>
+    </ul>
+  </section>
+</main>
+<script src="js/methodology.js"></script>
+</body>
+</html>
