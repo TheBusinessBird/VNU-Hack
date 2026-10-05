@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="680" viewBox="0 0 1400 680" role="img" aria-labelledby="title desc">
+<title id="title">Arhitectura PoliticieniRO</title>
+<desc id="desc">Frontend HTML CSS JavaScript comunică prin HTTP JSON cu backend-ul Python. Backend-ul caută surse publice, apelează Groq și opțional Claude, și scrie cache JSON pe disc. Frontend-ul păstrează rezultatul quiz-ului în localStorage.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#425466"/></marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2764a5"/></marker>
+  <style>
+    text{font-family:Segoe UI,Arial,sans-serif;fill:#172b3a}.title{font-size:30px;font-weight:700}.label{font-size:22px;font-weight:650}.sub{font-size:16px;fill:#455868}.edge{stroke:#425466;stroke-width:3;fill:none;marker-end:url(#arrow)}.blue{stroke:#2764a5;stroke-width:3;fill:none;marker-end:url(#arrowBlue)}.optional{stroke:#7b8792;stroke-width:2.5;stroke-dasharray:9 8;fill:none;marker-end:url(#arrow)}
+  </style>
+</defs>
+<rect width="1400" height="680" fill="#f6f8fb" rx="24"/>
+<text x="700" y="52" text-anchor="middle" class="title">PoliticieniRO · arhitectură tehnică</text>
+<!-- Frontend -->
+<rect x="80" y="235" width="285" height="120" rx="18" fill="#e5f0ff" stroke="#4f7fb6" stroke-width="2.5"/>
+<text x="222" y="280" text-anchor="middle" class="label">Frontend</text><text x="222" y="315" text-anchor="middle" class="sub">HTML · CSS · JavaScript</text>
+<!-- Backend -->
+<rect x="525" y="235" width="285" height="120" rx="18" fill="#e7f5ec" stroke="#4c9163" stroke-width="2.5"/>
+<text x="667" y="280" text-anchor="middle" class="label">Backend</text><text x="667" y="315" text-anchor="middle" class="sub">Python · HTTP API</text>
+<!-- External sources -->
+<rect x="1030" y="90" width="285" height="112" rx="18" fill="#fff2d9" stroke="#bc8b31" stroke-width="2.5"/>
+<text x="1172" y="135" text-anchor="middle" class="label">Surse publice</text><text x="1172" y="167" text-anchor="middle" class="sub">Bing RSS · site-uri web</text>
+<!-- Groq -->
+<rect x="1030" y="255" width="285" height="112" rx="18" fill="#eee8ff" stroke="#8064b1" stroke-width="2.5"/>
+<text x="1172" y="300" text-anchor="middle" class="label">Groq</text><text x="1172" y="332" text-anchor="middle" class="sub">API compatibil OpenAI</text>
+<!-- Claude -->
+<rect x="1030" y="430" width="285" height="112" rx="18" fill="#f1f2f4" stroke="#87909a" stroke-width="2.5"/>
+<text x="1172" y="475" text-anchor="middle" class="label">Claude API</text><text x="1172" y="507" text-anchor="middle" class="sub">opțional · numai rezumate</text>
+<!-- Cache -->
+<ellipse cx="667" cy="505" rx="150" ry="57" fill="#fff0e8" stroke="#bd7959" stroke-width="2.5"/>
+<text x="667" y="500" text-anchor="middle" class="label">Cache JSON</text><text x="667" y="529" text-anchor="middle" class="sub">fișiere pe disc</text>
+<!-- Local storage -->
+<ellipse cx="222" cy="505" rx="150" ry="57" fill="#e4f5f5" stroke="#478e91" stroke-width="2.5"/>
+<text x="222" y="500" text-anchor="middle" class="label">localStorage</text><text x="222" y="529" text-anchor="middle" class="sub">rezultatul quiz-ului</text>
+<!-- Connections -->
+<path d="M365 285 H525" class="edge" marker-start="url(#arrow)"/>
+<text x="445" y="265" text-anchor="middle" class="sub">HTTP JSON</text>
+<path d="M810 260 C885 240 945 190 1030 160" class="edge"/>
+<text x="906" y="205" text-anchor="middle" class="sub">căutare și preluare</text>
+<path d="M810 295 H1030" class="blue" marker-start="url(#arrowBlue)"/>
+<text x="920" y="278" text-anchor="middle" class="sub">cereri / răspunsuri</text>
+<path d="M810 330 C900 360 965 430 1030 465" class="optional"/>
+<text x="920" y="410" text-anchor="middle" class="sub">doar rezumate</text>
+<path d="M667 355 V448" class="edge" marker-end="url(#arrow)"/>
+<text x="708" y="408" class="sub">citire / scriere</text>
+<path d="M222 355 V448" class="edge" marker-end="url(#arrow)"/>
+<text x="263" y="408" class="sub">cache local</text>
+</svg>
